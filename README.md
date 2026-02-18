@@ -31,6 +31,9 @@ Contributions to the development of the methods implemented in GCTA (e.g., GREML
 If you have any bug reports or questions please send an email to Jian Yang at <jian.yang@westlake.edu.cn>.
 
 
+## Edits
+1. Removed colinearity condition which breaks with rare variants
+
 ## Compilation
 
 #### Requirements
