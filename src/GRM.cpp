@@ -1390,19 +1390,29 @@ void GRM::deduce_GRM(){
     }
 
     float mtd_weight = 1.0;
+    double grm_alpha = options_d["grm_alpha"];
     if(options_b["isMtd"]){
         float weight = 0;
         if(!isDominance){
             for(int i = 0; i < numValidMarkers; i++){
                 //float af = geno->AFA1[i];
-                //float sd = 2.0 * af * (1.0 - af); 
-                weight += sd[i];
+                //float sd = 2.0 * af * (1.0 - af);
+                // With alpha weighting: accumulate (2pq)^alpha instead of 2pq
+                if(grm_alpha == 1.0){
+                    weight += sd[i];
+                }else{
+                    weight += pow(sd[i], grm_alpha);
+                }
             }
         }else{
             for(int i = 0; i < numValidMarkers; i++){
                 //float af = geno->AFA1[i];
-                //float sd = 2.0 * af * (1.0 - af); 
-                weight += sd[i] * sd[i];
+                //float sd = 2.0 * af * (1.0 - af);
+                if(grm_alpha == 1.0){
+                    weight += sd[i] * sd[i];
+                }else{
+                    weight += pow(sd[i], 2.0 * grm_alpha);
+                }
             }
         }
         mtd_weight = 1.0 / (weight / numValidMarkers);
@@ -1824,6 +1834,25 @@ int GRM::registerOption(map<string, vector<string>>& options_in) {
         options_b["isMtd"] = true;
     }
 
+    // LDAK-style alpha weighting for GRM: denominator becomes (2pq)^alpha
+    // Default alpha = -0.25 when flag is used without value, otherwise alpha = 1.0 (standard GRM)
+    options_d["grm_alpha"] = 1.0; // standard GRM by default
+    string op_grm_alpha = "--grm-alpha";
+    if(options_in.find(op_grm_alpha) != options_in.end()){
+        if(options_in[op_grm_alpha].size() == 0){
+            options_d["grm_alpha"] = -0.25; // LDAK default
+        }else if(options_in[op_grm_alpha].size() == 1){
+            try{
+                options_d["grm_alpha"] = std::stod(options_in[op_grm_alpha][0]);
+            }catch(std::invalid_argument&){
+                LOGGER.e(0, "--grm-alpha requires a numeric value.");
+            }
+        }else{
+            LOGGER.e(0, "--grm-alpha takes at most one argument.");
+        }
+        options_in.erase(op_grm_alpha);
+    }
+
         /*
     string op_grm_sparse = "--make-grm-sparse";
     if(options_in.find(op_grm_sparse) != options_in.end()){
@@ -1989,6 +2018,14 @@ void GRM::processMakeGRM(){
         LOGGER.e(0, "the original version has been deleted. Please use GCTA >= 1.92.4");
     }
     geno->setGRMMode(true, isDominance);
+    double grm_alpha = options_d["grm_alpha"];
+    geno->setGRMAlpha(grm_alpha);
+    if(grm_alpha != 1.0){
+        LOGGER << "  Using LDAK-style alpha weighting: denominator = (2pq)^" << grm_alpha << std::endl;
+    }
+    if(geno->genoFormat == "PGEN"){
+        LOGGER.w(0, "PGEN format detected: only hard-call genotypes will be used for GRM calculation. Dosage data in the PGEN file will be ignored.");
+    }
     bool isSTD = true;
     if(isMtd) isSTD = false;
     vector<uint32_t> processIndex = marker->get_extract_index_autosome();
@@ -2027,6 +2064,14 @@ void GRM::processMakeGRMX(){
         LOGGER.e(0, "the original version has been deleted. Please use GCTA >= 1.92.4");
     }
     geno->setGRMMode(true, isDominance);
+    double grm_alpha = options_d["grm_alpha"];
+    geno->setGRMAlpha(grm_alpha);
+    if(grm_alpha != 1.0){
+        LOGGER << "  Using LDAK-style alpha weighting: denominator = (2pq)^" << grm_alpha << std::endl;
+    }
+    if(geno->genoFormat == "PGEN"){
+        LOGGER.w(0, "PGEN format detected: only hard-call genotypes will be used for GRM calculation. Dosage data in the PGEN file will be ignored.");
+    }
     bool isSTD = true;
     if(isMtd) isSTD = false;
     vector<uint32_t> processIndex = marker->get_extract_index_X();
