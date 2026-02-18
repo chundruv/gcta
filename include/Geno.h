@@ -290,7 +290,7 @@ private:
     bool bMakeMiss;
     bool bGRM = false;
     bool bGRMDom = false;
-    double grm_alpha = 1.0; // default alpha=1.0 gives standard GRM (denominator = 2pq)
+    double grm_alpha = -1.0; // default alpha=-1.0 gives standard GRM: (2pq)^(-0.5)
     int iGRMdc = -1; // 0 no male dosage comp; 1 full comp; //default value shall be -1, equal variance
     int iDC = 1;
     bool f_std = false;

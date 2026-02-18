@@ -942,13 +942,12 @@ void Geno::getGenoDouble_bed(uintptr_t *buf, int idx, GenoBufItem* gbuf){
                         center_value = mu;
                     }
                     if(bGenoStd){
-                        // Standard GRM: rdev = 1/sqrt(2pq) = (2pq)^(-0.5)
-                        // Alpha-weighted: rdev = (2pq)^(-alpha/2)
-                        // When alpha=1.0, this reduces to the standard formula
-                        if(grm_alpha == 1.0){
+                        // Standard GRM (alpha=-1): rdev = 1/sqrt(2pq) = (2pq)^(-0.5)
+                        // General: rdev = (2pq)^(alpha/2)
+                        if(grm_alpha == -1.0){
                             rdev = sqrt(1.0 / sd);
                         }else{
-                            rdev = pow(sd, -grm_alpha / 2.0);
+                            rdev = pow(sd, grm_alpha / 2.0);
                         }
                     }
                     double aa0 = 0.0, aa2 = 2.0;
@@ -966,12 +965,12 @@ void Geno::getGenoDouble_bed(uintptr_t *buf, int idx, GenoBufItem* gbuf){
                    double psq = 0.5 * mu * mu;
                    if(bGenoCenter)center_value = psq; // psq
                    if(bGenoStd){
-                       // Standard: rdev = 1/(2pq) = (2pq)^(-1)
-                       // Alpha-weighted: rdev = (2pq)^(-alpha)
-                       if(grm_alpha == 1.0){
+                       // Standard dominance (alpha=-1): rdev = 1/(2pq) = (2pq)^(-1)
+                       // General: rdev = (2pq)^(alpha)
+                       if(grm_alpha == -1.0){
                            rdev = 1.0 / sd;
                        }else{
-                           rdev = pow(sd, -grm_alpha);
+                           rdev = pow(sd, grm_alpha);
                        }
                    }
                    double aa0 = 0.0, aa2 = 2.0 * mu - 2.0;
@@ -1392,10 +1391,10 @@ void Geno::getGenoDouble_bgen(uintptr_t *buf, int idx, GenoBufItem* gbuf){
                         center_value = mu;
                     }
                     if(bGenoStd){
-                        if(grm_alpha == 1.0){
+                        if(grm_alpha == -1.0){
                             rdev = sqrt(1.0 / std);
                         }else{
-                            rdev = pow(std, -grm_alpha / 2.0);
+                            rdev = pow(std, grm_alpha / 2.0);
                         }
                     }
 
@@ -1416,10 +1415,10 @@ void Geno::getGenoDouble_bgen(uintptr_t *buf, int idx, GenoBufItem* gbuf){
 
                     if(bGenoCenter)center_value = psq; // psq
                     if(bGenoStd){
-                        if(grm_alpha == 1.0){
+                        if(grm_alpha == -1.0){
                             rdev = 1.0 / std;
                         }else{
-                            rdev = pow(std, -grm_alpha);
+                            rdev = pow(std, grm_alpha);
                         }
                     }
                     double a0 = (dos00 - center_value) * rdev;

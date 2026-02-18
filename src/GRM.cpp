@@ -1395,23 +1395,22 @@ void GRM::deduce_GRM(){
         float weight = 0;
         if(!isDominance){
             for(int i = 0; i < numValidMarkers; i++){
-                //float af = geno->AFA1[i];
-                //float sd = 2.0 * af * (1.0 - af);
-                // With alpha weighting: accumulate (2pq)^alpha instead of 2pq
-                if(grm_alpha == 1.0){
+                // MTD denominator: sum of (2pq)^(-alpha) for additive
+                // Standard (alpha=-1): sum of 2pq
+                if(grm_alpha == -1.0){
                     weight += sd[i];
                 }else{
-                    weight += pow(sd[i], grm_alpha);
+                    weight += pow(sd[i], -grm_alpha);
                 }
             }
         }else{
             for(int i = 0; i < numValidMarkers; i++){
-                //float af = geno->AFA1[i];
-                //float sd = 2.0 * af * (1.0 - af);
-                if(grm_alpha == 1.0){
+                // MTD denominator for dominance: sum of (2pq)^(-2*alpha)
+                // Standard (alpha=-1): sum of (2pq)^2
+                if(grm_alpha == -1.0){
                     weight += sd[i] * sd[i];
                 }else{
-                    weight += pow(sd[i], 2.0 * grm_alpha);
+                    weight += pow(sd[i], -2.0 * grm_alpha);
                 }
             }
         }
@@ -1834,9 +1833,10 @@ int GRM::registerOption(map<string, vector<string>>& options_in) {
         options_b["isMtd"] = true;
     }
 
-    // LDAK-style alpha weighting for GRM: denominator becomes (2pq)^alpha
-    // Default alpha = -0.25 when flag is used without value, otherwise alpha = 1.0 (standard GRM)
-    options_d["grm_alpha"] = 1.0; // standard GRM by default
+    // LDAK-style alpha weighting for GRM: rdev = (2pq)^(alpha/2)
+    // Standard GRM: alpha=-1 gives rdev = (2pq)^(-0.5) = 1/sqrt(2pq)
+    // LDAK default: alpha=-0.25
+    options_d["grm_alpha"] = -1.0; // standard GRM by default
     string op_grm_alpha = "--grm-alpha";
     if(options_in.find(op_grm_alpha) != options_in.end()){
         if(options_in[op_grm_alpha].size() == 0){
@@ -2020,8 +2020,8 @@ void GRM::processMakeGRM(){
     geno->setGRMMode(true, isDominance);
     double grm_alpha = options_d["grm_alpha"];
     geno->setGRMAlpha(grm_alpha);
-    if(grm_alpha != 1.0){
-        LOGGER << "  Using LDAK-style alpha weighting: denominator = (2pq)^" << grm_alpha << std::endl;
+    if(grm_alpha != -1.0){
+        LOGGER << "  Using alpha weighting: rdev = (2pq)^(" << grm_alpha << "/2), alpha=" << grm_alpha << std::endl;
     }
     if(geno->genoFormat == "PGEN"){
         LOGGER.w(0, "PGEN format detected: only hard-call genotypes will be used for GRM calculation. Dosage data in the PGEN file will be ignored.");
@@ -2066,8 +2066,8 @@ void GRM::processMakeGRMX(){
     geno->setGRMMode(true, isDominance);
     double grm_alpha = options_d["grm_alpha"];
     geno->setGRMAlpha(grm_alpha);
-    if(grm_alpha != 1.0){
-        LOGGER << "  Using LDAK-style alpha weighting: denominator = (2pq)^" << grm_alpha << std::endl;
+    if(grm_alpha != -1.0){
+        LOGGER << "  Using alpha weighting: rdev = (2pq)^(" << grm_alpha << "/2), alpha=" << grm_alpha << std::endl;
     }
     if(geno->genoFormat == "PGEN"){
         LOGGER.w(0, "PGEN format detected: only hard-call genotypes will be used for GRM calculation. Dosage data in the PGEN file will be ignored.");
