@@ -187,6 +187,7 @@ private:
     void bgen2bed(const vector<uint32_t> &raw_marker_index);
 
     friend class LD;
+    friend class GRM;
 
 // seq read start;
     string genoFormat = "";
