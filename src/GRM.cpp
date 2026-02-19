@@ -1391,26 +1391,44 @@ void GRM::deduce_GRM(){
 
     float mtd_weight = 1.0;
     double grm_alpha = options_d["grm_alpha"];
+
+    // Alpha normalization: when alpha != -1, the GRM diagonal is E[(2pq)^(1+alpha)]
+    // instead of 1.0. Normalize by M / sum((2pq)^(1+alpha)) so diagonal averages to ~1.
+    if(grm_alpha != -1.0){
+        double alpha_norm_sum = 0.0;
+        if(!isDominance){
+            for(int i = 0; i < numValidMarkers; i++){
+                alpha_norm_sum += pow(sd[i], 1.0 + grm_alpha);
+            }
+        }else{
+            // Dominance: per-SNP contribution is (2pq)^(2*(1+alpha))
+            for(int i = 0; i < numValidMarkers; i++){
+                alpha_norm_sum += pow(sd[i], 2.0 * (1.0 + grm_alpha));
+            }
+        }
+        if(alpha_norm_sum > 0){
+            mtd_weight = (double)numValidMarkers / alpha_norm_sum;
+            LOGGER << "  Alpha normalization factor: " << mtd_weight << " (rescaling GRM so diagonal ~ 1.0)" << std::endl;
+        }
+    }
+
     if(options_b["isMtd"]){
         float weight = 0;
         if(!isDominance){
             for(int i = 0; i < numValidMarkers; i++){
-                // MTD denominator: sum of (2pq)^(-alpha) for additive
-                // Standard (alpha=-1): sum of 2pq
+                // MTD denominator: sum of 2pq for standard
                 if(grm_alpha == -1.0){
                     weight += sd[i];
                 }else{
-                    weight += pow(sd[i], -grm_alpha);
+                    weight += pow(sd[i], 1.0 + grm_alpha);
                 }
             }
         }else{
             for(int i = 0; i < numValidMarkers; i++){
-                // MTD denominator for dominance: sum of (2pq)^(-2*alpha)
-                // Standard (alpha=-1): sum of (2pq)^2
                 if(grm_alpha == -1.0){
                     weight += sd[i] * sd[i];
                 }else{
-                    weight += pow(sd[i], -2.0 * grm_alpha);
+                    weight += pow(sd[i], 2.0 * (1.0 + grm_alpha));
                 }
             }
         }
