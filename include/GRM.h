@@ -79,7 +79,7 @@ private:
     pair<uint32_t, uint32_t> part_keep_indices; //the index in pheno keep index;
     vector<pair<int, int>> index_grm_pairs;
 
-    double *grm = NULL;
+    float *grm = NULL;
     uint32_t *N = NULL;
     uint32_t *sub_miss = NULL; // sample miss in all markers
 
@@ -112,7 +112,7 @@ private:
     //end for byte style calculation
 
     bool bBLAS;
-    double *stdGeno = NULL;
+    float *stdGeno = NULL;
 
     void output_id();
 

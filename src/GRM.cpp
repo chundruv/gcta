@@ -805,11 +805,11 @@ GRM::GRM(Pheno* pheno, Marker* marker) {
         fill_grm = (uint64_t)num_individual * (part_keep_indices.second + 1);
     }
 
-    int ret_grm = posix_memalign((void **)&grm, 32, fill_grm * sizeof(double));
+    int ret_grm = posix_memalign((void **)&grm, 32, fill_grm * sizeof(float));
     if(ret_grm){
-        LOGGER.e(0, "can't allocate enough memory to store the (parted) GRM: " + to_string(fill_grm*sizeof(double) / 1024.0/1024/1024) + "GB required.");
+        LOGGER.e(0, "can't allocate enough memory to store the (parted) GRM: " + to_string(fill_grm*sizeof(float) / 1024.0/1024/1024) + "GB required.");
     }
-    memset(grm, 0, fill_grm * sizeof(double));
+    memset(grm, 0, fill_grm * sizeof(float));
 
     int ret_N = posix_memalign((void **)&N, 32, fill_N * sizeof(uint32_t));
     if(ret_N){
@@ -937,10 +937,9 @@ void GRM::calculate_GRM_blas(uintptr_t *buf, const vector<uint32_t> &markerIndex
     static int n = part_keep_indices.second + 1;
     static int n_sample = n;
     static int s_n = n - m;
-    static int bytesStdGeno = sizeof(double) * n_sample;
 
    // GenoBufItem items[num_marker];
- 
+
     #pragma omp parallel for
     for(int i = 0; i < num_marker; i++){
         GenoBufItem &item = gbufitems[i];
@@ -958,37 +957,38 @@ void GRM::calculate_GRM_blas(uintptr_t *buf, const vector<uint32_t> &markerIndex
 
     int curNumValidMarkers = validIndex.size();
 
+    // Convert double genotypes to float for single-precision BLAS
     for(int i = 0; i < curNumValidMarkers; i++){
         int curIndex = validIndex[i];
-        memcpy(stdGeno + i * n_sample, gbufitems[curIndex].geno.data(), bytesStdGeno);
+        const double *src = gbufitems[curIndex].geno.data();
+        float *dst = stdGeno + (uint64_t)i * n_sample;
+        for(int j = 0; j < n_sample; j++){
+            dst[j] = (float)src[j];
+        }
         sd.push_back(gbufitems[curIndex].sd);
-        /*
-        if(gbufitems[i].missing[41/64] & (1UL << (41 %64))){
-        */
     }
 
     static char notrans='N', trans='T';
-    static double alpha = 1.0, beta = 1.0;
+    static float alpha = 1.0f, beta = 1.0f;
     static char uplo='L';
-   // A * At 
+   // A * At  (single precision)
     if(part_keep_indices.first == 0){
 #if GCTA_CPU_x86
-        dsyrk(&uplo, &notrans, &n, &curNumValidMarkers, &alpha, stdGeno, &n_sample, &beta, grm, &m);
+        ssyrk(&uplo, &notrans, &n, &curNumValidMarkers, &alpha, stdGeno, &n_sample, &beta, grm, &m);
 #else
-        dsyrk_(&uplo, &notrans, &n, &curNumValidMarkers, &alpha, stdGeno, &n_sample, &beta, grm, &m);
+        ssyrk_(&uplo, &notrans, &n, &curNumValidMarkers, &alpha, stdGeno, &n_sample, &beta, grm, &m);
 #endif
     }else{
-        //dgemm(&notrans, &trans, &m, &n, &num_marker, &alpha, stdGeno + part_keep_indices.first, &n_sample, stdGeno, &n_sample, &beta, grm, &m);
 #if GCTA_CPU_x86
-        dgemm(&notrans, &trans, &m, &s_n, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, stdGeno, &n_sample, &beta, grm, &m);
+        sgemm(&notrans, &trans, &m, &s_n, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, stdGeno, &n_sample, &beta, grm, &m);
 #else
-        dgemm_(&notrans, &trans, &m, &s_n, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, stdGeno, &n_sample, &beta, grm, &m);
+        sgemm_(&notrans, &trans, &m, &s_n, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, stdGeno, &n_sample, &beta, grm, &m);
 #endif
-        double * grm_start = grm + ((uint64_t)s_n) * m;
+        float * grm_start = grm + ((uint64_t)s_n) * m;
 #if GCTA_CPU_x86
-        dsyrk(&uplo, &notrans, &m, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, &beta, grm_start, &m); 
+        ssyrk(&uplo, &notrans, &m, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, &beta, grm_start, &m);
 #else
-        dsyrk_(&uplo, &notrans, &m, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, &beta, grm_start, &m); 
+        ssyrk_(&uplo, &notrans, &m, &curNumValidMarkers, &alpha, stdGeno + part_keep_indices.first, &n_sample, &beta, grm_start, &m);
 #endif
     }
 
@@ -1448,7 +1448,7 @@ void GRM::deduce_GRM(){
     float *w_grm = new float[num_sample];
     float *w_N = new float[num_sample];
 
-    double *po_grm = grm;
+    float *po_grm = grm;
     uint32_t *po_N = N;
 
     uint64_t m = part_keep_indices.second - part_keep_indices.first + 1;
@@ -1578,7 +1578,7 @@ void GRM::N_thread(int grm_index_from, int grm_index_to, const uintptr_t* cur_cm
 
 void GRM::grm_thread(int grm_index_from, int grm_index_to) {
 
-    double *po_grm;
+    float *po_grm;
     uint64_t geno, mask;
     uint64_t *p_geno1, *p_geno2, geno1;
     uint64_t *p_mask1, *p_mask2, mask1;
@@ -1587,7 +1587,7 @@ void GRM::grm_thread(int grm_index_from, int grm_index_to) {
     double *table0, *table1, *table2, *table3;
     int cur_geno_block, start_geno_block;
     uint64_t grm_pos_offset = ((uint64_t)grm_index_from + 1 + part_keep_indices.first) * (grm_index_from - part_keep_indices.first) / 2;
-    double *po_grm_start = grm + grm_pos_offset;
+    float *po_grm_start = grm + grm_pos_offset;
     for (int cur_block = 0; cur_block != cur_num_block; cur_block++) {
         cur_geno_block = cur_block * num_block_handle;
         start_geno_block = cur_geno_block * index_keep.size();
@@ -2043,7 +2043,7 @@ void GRM::processMakeGRM(){
         gbufitems[i].missing.resize(missPtrSize);
     }
     */
-    this->num_byte_geno = sizeof(double) * nMarkerBlock * (part_keep_indices.second + 1);
+    this->num_byte_geno = sizeof(float) * nMarkerBlock * (part_keep_indices.second + 1);
     int ret = posix_memalign((void **)&stdGeno, 32, num_byte_geno);
     if(ret != 0){
         LOGGER.e(0, "can't allocate enough memory for the genotype buffer.");
@@ -2090,7 +2090,7 @@ void GRM::processMakeGRMX(){
         gbufitems[i].missing.resize(missPtrSize);
     }
     */
-    this->num_byte_geno = sizeof(double) * nMarkerBlock * (part_keep_indices.second + 1);
+    this->num_byte_geno = sizeof(float) * nMarkerBlock * (part_keep_indices.second + 1);
     int ret = posix_memalign((void **)&stdGeno, 32, num_byte_geno);
     if(ret != 0){
         LOGGER.e(0, "can't allocate enough memory for the genotype buffer.");
