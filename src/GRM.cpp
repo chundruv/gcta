@@ -1871,6 +1871,26 @@ int GRM::registerOption(map<string, vector<string>>& options_in) {
         options_in.erase(op_grm_alpha);
     }
 
+    // Marker block size for BLAS GRM computation (larger = faster but more memory)
+    options_d["grm_block"] = 1024; // default
+    string op_grm_block = "--grm-block";
+    if(options_in.find(op_grm_block) != options_in.end()){
+        if(options_in[op_grm_block].size() == 1){
+            try{
+                int block = std::stoi(options_in[op_grm_block][0]);
+                if(block < 1){
+                    LOGGER.e(0, "--grm-block must be >= 1.");
+                }
+                options_d["grm_block"] = (double)block;
+            }catch(std::invalid_argument&){
+                LOGGER.e(0, "--grm-block requires an integer value.");
+            }
+        }else{
+            LOGGER.e(0, "--grm-block takes exactly one argument.");
+        }
+        options_in.erase(op_grm_block);
+    }
+
         /*
     string op_grm_sparse = "--make-grm-sparse";
     if(options_in.find(op_grm_sparse) != options_in.end()){
@@ -2012,10 +2032,11 @@ int GRM::registerOption(map<string, vector<string>>& options_in) {
 }
 
 void GRM::processMakeGRM(){
-    nMarkerBlock = 128;
+    nMarkerBlock = (int)options_d["grm_block"];
+    LOGGER << "  GRM marker block size: " << nMarkerBlock << std::endl;
     gbufitems = new GenoBufItem[nMarkerBlock];
     /*
-    uint32_t sampleCT, missPtrSize; 
+    uint32_t sampleCT, missPtrSize;
     geno->setGenoItemSize(sampleCT, missPtrSize);
     for(int i = 0; i < nMarkerBlock; i++){
         gbufitems[i].geno.resize(sampleCT);
@@ -2058,10 +2079,11 @@ void GRM::processMakeGRM(){
 }
 
 void GRM::processMakeGRMX(){
-    nMarkerBlock = 128;
+    nMarkerBlock = (int)options_d["grm_block"];
+    LOGGER << "  GRM marker block size: " << nMarkerBlock << std::endl;
     gbufitems = new GenoBufItem[nMarkerBlock];
     /*
-    uint32_t sampleCT, missPtrSize; 
+    uint32_t sampleCT, missPtrSize;
     geno->setGenoItemSize(sampleCT, missPtrSize);
     for(int i = 0; i < nMarkerBlock; i++){
         gbufitems[i].geno.resize(sampleCT);
